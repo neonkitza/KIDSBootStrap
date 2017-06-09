@@ -6,37 +6,20 @@
 #include <sstream>
 #pragma comment(lib,"ws2_32.lib")
 
-typedef struct
-{
-	std::string id;
-	SOCKADDR_IN address;
-	SOCKET socket;
-
-}Node;
-struct MyPacket
+struct BSPacket
 {
 	std::string command;
-	Node node;
-};
-
-struct AcceptPacket
-{
-	std::string command;
-	socketStruct whereTo;
-	socketStruct me;
+	SOCKADDR_IN whereTo;
+	SOCKADDR_IN me;
 };
 
 typedef struct {
-	SOCKADDR_IN address;
-	SOCKET socket;
-}socketStruct;
-typedef struct {
-	SOCKADDR_IN address;
-	SOCKET socket;
+	SOCKADDR_IN whereTo;
+	SOCKADDR_IN me;
 	int i;
-}socketStructi;
+}BSPacketi;
 
-std::map<int, socketStruct> servents;
+std::map<int, SOCKADDR_IN> servents;
 
 SOCKET sock; // this is the socket that we will use it 
 SOCKET sock2[200]; // this is the sockets that will be recived from the Clients and sended to them
@@ -90,18 +73,15 @@ int EndSocket()
 
 void AcceptClient(void *vArgs)
 {
-	socketStructi* st = (socketStructi*)vArgs;
+	BSPacketi* st = (BSPacketi*)vArgs;
 
-	socketStruct ss;
-	ss.address = st->address;
-	ss.socket = st->socket;
-	servents.insert(std::pair<int, socketStruct>(st->i, ss));
+	servents.insert(std::pair<int, SOCKADDR_IN>(st->i, st->me));
 
-	AcceptPacket mp;
+	BSPacket mp;
 	if (st->i == 0)
 	{
-		mp.command = "YOUAREZERO";
-		mp.me = ss;
+		mp.command = "FIRST";
+		mp.me = st->me;
 
 	}
 	else
@@ -111,7 +91,7 @@ void AcceptClient(void *vArgs)
 			r = rand() % servents.size();
 
 		mp.command = "GOTO";
-		mp.me = ss;
+		mp.me = st->me;
 		mp.whereTo = servents[r];
 
 	}
@@ -120,7 +100,7 @@ void AcceptClient(void *vArgs)
 	//ss << "GOTO";
 	//mp.command = "GOTO";
 	
-	Send((char*)&mp, sizeof(MyPacket), st->i);
+	Send((char*)&mp, sizeof(BSPacket), st->i);
 	//clients++;
 	delete(st);
 	//printf("ACCEPTED!");
@@ -169,10 +149,10 @@ int StartServer(int Port)
 
 		}
 		//int i = clients;
-		socketStructi* st = new socketStructi();
+		BSPacketi* st = new BSPacketi();
 		st->i = clients;
-		st->address = i_sock2;
-		st->socket = sock2[clients];
+		st->whereTo = i_sock2;
+		st->me = i_sock2;
 		clients++;
 		_beginthread(AcceptClient, NULL, (void*)st);
 
