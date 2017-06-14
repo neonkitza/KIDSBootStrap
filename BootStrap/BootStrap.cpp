@@ -1,16 +1,20 @@
 #include "stdafx.h"
 #include <Windows.h>
+#include <iostream>
 #include <map>
 #include <thread>
 #include <process.h>
 #include <sstream>
+#include "commands.h"
 #pragma comment(lib,"ws2_32.lib")
 
 struct BSPacket
 {
-	std::string command;
+	int command;
 	SOCKADDR_IN whereTo;
 	SOCKADDR_IN me;
+	int width;
+	int height;
 };
 
 typedef struct {
@@ -29,11 +33,15 @@ WSADATA Data; // this is to save our socket version
 int clients = 0; // we will use it in the accepting clients
 int StartServer(int);
 void AcceptClient(void *vArgs);
-
+int width=800, height=800;
 
 int EndSocket();
 int main()
 {
+	std::cout << "Enter height: ";
+	std::cin >> height;
+	std::cout << "Enter width: ";
+	std::cin >> width;
 	StartServer(9999);
 	EndSocket();
 	return 0;
@@ -78,19 +86,26 @@ void AcceptClient(void *vArgs)
 	servents.insert(std::pair<int, SOCKADDR_IN>(st->i, st->me));
 
 	BSPacket mp;
+	mp.height = height;
+	mp.width = width;
 	if (st->i == 0)
 	{
-		mp.command = "FIRST";
+		mp.command = YOUAREZERO;
 		mp.me = st->me;
 
 	}
 	else
 	{
 		int r = rand() % servents.size();
-		while (r == st->i)
+		std::map<int, SOCKADDR_IN>::iterator it;
+		it = servents.find(r);
+		while (r == st->i || it == servents.end())
+		{
 			r = rand() % servents.size();
+			it = servents.find(r);
+		}
 
-		mp.command = "GOTO";
+		mp.command = GOTO;
 		mp.me = st->me;
 		mp.whereTo = servents[r];
 
@@ -102,11 +117,43 @@ void AcceptClient(void *vArgs)
 	
 	Send((char*)&mp, sizeof(BSPacket), st->i);
 	//clients++;
+
+
+	//printf("Accepted client's port:%s\n", servents[0]);
 	delete(st);
 	//printf("ACCEPTED!");
 	
 }
+void checkIfAlive(void* argv)
+{
+	int c = 0;
+	while (1)
+	{
+		if (c == clients)
+		{
+			c = 0;
+			Sleep(60000);
+		}
+		int err;
+		WSADATA data;
+		WSAStartup(MAKEWORD(2, 2), &data);
+		SOCKET sock1 = socket(AF_INET, SOCK_STREAM, 0);
+		if (sock1 == INVALID_SOCKET)
+		{
+			printf("INVALID SOCKET!!!");
+		}
+		SOCKADDR_IN i_sockc = servents[c];
+		int ss = connect(sock1, (struct sockaddr*)&i_sockc, sizeof(i_sockc));
+		if (ss != 0)
+		{
 
+			printf("Cannot connect to the servent!\n");
+			servents.erase(c);
+		}
+		c++;
+		
+	}
+}
 int StartServer(int Port)
 {
 	int err;
@@ -135,7 +182,7 @@ int StartServer(int Port)
 
 		return 0;
 	}
-
+	_beginthread(checkIfAlive, NULL, NULL);
 	//bind(sock, (struct sockaddr*)&i_sock, sizeof(i_sock));
 
 	//listen(sock, 100);
